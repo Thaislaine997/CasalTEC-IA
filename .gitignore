@@ -1,0 +1,16 @@
+# Variáveis de ambiente — NUNCA subir pro GitHub
+.env
+.env.local
+.env.*.local
+.env.production
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Dependências (caso adicione Node futuramente)
+node_modules/
