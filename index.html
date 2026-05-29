@@ -30,33 +30,46 @@
       <div class="setup-step">
         <div class="step-num">1</div>
         <div class="step-content">
-          <strong>Crie um projeto no Firebase</strong>
-          <a href="https://console.firebase.google.com" target="_blank" class="setup-link">console.firebase.google.com →</a>
-          <small>Gratuito · Plano Spark · Realtime Database</small>
+          <strong>Crie um projeto no Supabase</strong>
+          <a href="https://supabase.com/dashboard" target="_blank" class="setup-link">supabase.com/dashboard →</a>
+          <small>Gratuito · Plano Free · até 500 MB</small>
         </div>
       </div>
 
       <div class="setup-step">
         <div class="step-num">2</div>
         <div class="step-content">
-          <strong>Copie a URL do banco de dados</strong>
-          <small>Parece com: https://seu-projeto-default-rtdb.firebaseio.com</small>
+          <strong>Execute o SQL no SQL Editor do Supabase</strong>
+          <small>Cria as tabelas e ativa a sincronização em tempo real</small>
+          <button class="setup-sql-btn" onclick="App.copiarSQL()">Copiar SQL →</button>
         </div>
       </div>
 
       <div class="setup-step">
         <div class="step-num">3</div>
         <div class="step-content">
-          <strong>Cole sua chave da API Anthropic</strong>
-          <a href="https://console.anthropic.com/settings/keys" target="_blank" class="setup-link">console.anthropic.com →</a>
-          <small>Para leitura de comprovantes com IA</small>
+          <strong>Copie URL e chave anon do projeto</strong>
+          <small>Em Settings → API do painel do Supabase</small>
         </div>
       </div>
 
       <div class="setup-fields">
         <div class="field-group">
-          <label>URL do Firebase Realtime Database</label>
-          <input type="url" id="setup-firebase-url" placeholder="https://seu-projeto-default-rtdb.firebaseio.com">
+          <label>URL do projeto Supabase</label>
+          <input type="url" id="setup-supabase-url" placeholder="https://xxxxxxxxxxxx.supabase.co">
+        </div>
+        <div class="field-group">
+          <label>Chave anon (public)</label>
+          <input type="password" id="setup-supabase-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+        </div>
+        <div class="field-group">
+          <label>ID do casal <span class="optional">(compartilhe com o parceiro)</span></label>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="setup-casal-id" placeholder="Gere ou cole o ID do parceiro" style="flex:1">
+            <button class="btn-icon" onclick="App.gerarCasalId()" title="Gerar novo ID">⟳</button>
+            <button class="btn-icon" onclick="App.copiarCasalId()" title="Copiar ID">⎘</button>
+          </div>
+          <small style="color:var(--text3);margin-top:4px;display:block">Um celular gera o ID e o outro cola o mesmo ID</small>
         </div>
         <div class="field-group">
           <label>Chave API Anthropic <span class="optional">(opcional — para ler comprovantes)</span></label>
@@ -335,8 +348,16 @@
           <button onclick="App.closeSettings()" class="modal-close">×</button>
         </div>
         <div class="field-group">
-          <label>URL do Firebase</label>
-          <input type="url" id="cfg-firebase">
+          <label>URL do projeto Supabase</label>
+          <input type="url" id="cfg-supabase-url">
+        </div>
+        <div class="field-group">
+          <label>Chave anon Supabase</label>
+          <input type="password" id="cfg-supabase-key">
+        </div>
+        <div class="field-group">
+          <label>ID do casal</label>
+          <input type="text" id="cfg-casal-id">
         </div>
         <div class="field-group">
           <label>Chave API Anthropic</label>
@@ -354,6 +375,7 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

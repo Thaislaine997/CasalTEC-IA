@@ -1,6 +1,6 @@
 /* =============================================
    FINANÇAS DO CASAL — app.js
-   Firebase Realtime Database + Anthropic AI
+   Supabase Realtime + Anthropic Claude AI
    ============================================= */
 
 const App = (() => {
@@ -26,9 +26,10 @@ const App = (() => {
   let barInst = null;
   let cfg = {};
   let db = { txs: {}, orcamentos: [], contas_fixas: [] };
-  let fbListeners = [];
+  let sbClient = null;
+  let realtimeChannel = null;
 
-  /* ───── STORAGE ───── */
+  /* ───── LOCAL STORAGE ───── */
   function loadCfg() {
     try { cfg = JSON.parse(localStorage.getItem('casal_cfg') || '{}'); } catch { cfg = {}; }
   }
@@ -45,49 +46,16 @@ const App = (() => {
     localStorage.setItem('casal_db_' + k, JSON.stringify(v));
   }
 
-  /* ───── FIREBASE ───── */
-  function fbURL(path) {
-    return cfg.firebaseUrl.replace(/\/$/, '') + '/' + path + '.json';
-  }
-
-  async function fbGet(path) {
+  /* ───── SUPABASE ───── */
+  function initSupabase() {
+    if (!cfg.supabaseUrl || !cfg.supabaseKey) return false;
     try {
-      const r = await fetch(fbURL(path));
-      if (!r.ok) return null;
-      return await r.json();
-    } catch { return null; }
-  }
-
-  async function fbSet(path, value) {
-    try {
-      const r = await fetch(fbURL(path), {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(value)
-      });
-      return r.ok;
-    } catch { return false; }
-  }
-
-  async function fbPatch(path, value) {
-    try {
-      const r = await fetch(fbURL(path), {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(value)
-      });
-      return r.ok;
-    } catch { return false; }
-  }
-
-  async function fbDelete(path) {
-    try {
-      await fetch(fbURL(path), { method: 'DELETE' });
+      sbClient = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
       return true;
     } catch { return false; }
   }
 
-  /* ───── SYNC ───── */
+  /* ───── SYNC STATUS ───── */
   function setSyncStatus(st) {
     const el = document.getElementById('sync-status');
     if (!el) return;
@@ -95,63 +63,151 @@ const App = (() => {
     el.title = { synced: 'Sincronizado', syncing: 'Sincronizando...', offline: 'Sem conexão', local: 'Modo local' }[st] || '';
   }
 
-  async function loadAllFromFirebase() {
-    if (!cfg.firebaseUrl) return;
+  /* ───── LOAD DATA ───── */
+  async function loadAllFromSupabase() {
+    if (!sbClient || !cfg.casalId) return;
     setSyncStatus('syncing');
-    const data = await fbGet('casal');
-    if (data) {
-      db.txs = data.txs || {};
-      db.orcamentos = data.orcamentos || [];
-      db.contas_fixas = data.contas_fixas || [];
+    try {
+      const [txRes, cfgRes] = await Promise.all([
+        sbClient.from('transacoes').select('*').eq('casal_id', cfg.casalId),
+        sbClient.from('configs').select('*').eq('casal_id', cfg.casalId)
+      ]);
+      if (txRes.error || cfgRes.error) { setSyncStatus('offline'); return; }
+      db.txs = {};
+      (txRes.data || []).forEach(t => {
+        db.txs[t.id] = {
+          id: t.id, tipo: t.tipo, val: parseFloat(t.val),
+          desc: t.descricao, data: t.data,
+          cat: t.cat, pessoa: t.pessoa,
+          aiImport: t.ai_import
+        };
+      });
+      (cfgRes.data || []).forEach(c => {
+        if (c.chave === 'orcamentos' || c.chave === 'contas_fixas') {
+          db[c.chave] = c.valor || [];
+        }
+      });
       setSyncStatus('synced');
-    } else {
-      setSyncStatus('offline');
-    }
+    } catch { setSyncStatus('offline'); }
     render();
   }
 
+  /* ───── REALTIME ───── */
+  function subscribeRealtime() {
+    if (!sbClient || !cfg.casalId) return;
+    if (realtimeChannel) { sbClient.removeChannel(realtimeChannel); realtimeChannel = null; }
+    realtimeChannel = sbClient
+      .channel('casal-' + cfg.casalId)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transacoes', filter: 'casal_id=eq.' + cfg.casalId }, () => loadAllFromSupabase())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'configs', filter: 'casal_id=eq.' + cfg.casalId }, () => loadAllFromSupabase())
+      .subscribe();
+  }
+
+  /* ───── PUSH / REMOVE ───── */
   async function pushTx(tx) {
-    if (cfg.firebaseUrl) {
-      setSyncStatus('syncing');
-      const ok = await fbPatch('casal/txs', { [tx.id]: tx });
-      setSyncStatus(ok ? 'synced' : 'offline');
-    }
     db.txs[tx.id] = tx;
-    if (!cfg.firebaseUrl) saveLocalDB('txs', db.txs);
+    if (!sbClient || !cfg.casalId) { saveLocalDB('txs', db.txs); return; }
+    setSyncStatus('syncing');
+    const { error } = await sbClient.from('transacoes').upsert({
+      id: tx.id, casal_id: cfg.casalId,
+      tipo: tx.tipo, val: tx.val,
+      descricao: tx.desc, data: tx.data,
+      cat: tx.cat, pessoa: tx.pessoa,
+      ai_import: tx.aiImport || false
+    });
+    setSyncStatus(error ? 'offline' : 'synced');
   }
 
   async function removeTx(id) {
     delete db.txs[id];
-    if (cfg.firebaseUrl) {
-      setSyncStatus('syncing');
-      const ok = await fbDelete('casal/txs/' + id);
-      setSyncStatus(ok ? 'synced' : 'offline');
-    } else {
-      saveLocalDB('txs', db.txs);
-    }
+    if (!sbClient || !cfg.casalId) { saveLocalDB('txs', db.txs); return; }
+    setSyncStatus('syncing');
+    const { error } = await sbClient.from('transacoes').delete().eq('id', id).eq('casal_id', cfg.casalId);
+    setSyncStatus(error ? 'offline' : 'synced');
   }
 
   async function pushConfig(key, value) {
     db[key] = value;
-    if (cfg.firebaseUrl) {
-      setSyncStatus('syncing');
-      const ok = await fbSet('casal/' + key, value);
-      setSyncStatus(ok ? 'synced' : 'offline');
-    } else {
-      saveLocalDB(key, value);
-    }
+    if (!sbClient || !cfg.casalId) { saveLocalDB(key, value); return; }
+    setSyncStatus('syncing');
+    const { error } = await sbClient.from('configs').upsert({ casal_id: cfg.casalId, chave: key, valor: value });
+    setSyncStatus(error ? 'offline' : 'synced');
   }
 
   /* ───── SETUP ───── */
+  function generateId() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+  function gerarCasalId() {
+    document.getElementById('setup-casal-id').value = generateId();
+  }
+
+  const SQL_SETUP = `-- Execute no SQL Editor do Supabase (supabase.com/dashboard → SQL Editor)
+
+create table if not exists transacoes (
+  id bigint primary key,
+  casal_id text not null,
+  tipo text not null,
+  val numeric(12,2) not null,
+  descricao text not null,
+  data date not null,
+  cat text not null,
+  pessoa text not null,
+  ai_import boolean default false,
+  created_at timestamptz default now()
+);
+
+create table if not exists configs (
+  casal_id text not null,
+  chave text not null,
+  valor jsonb,
+  primary key (casal_id, chave)
+);
+
+alter table transacoes enable row level security;
+alter table configs enable row level security;
+
+create policy "anon_transacoes" on transacoes for all to anon using (true) with check (true);
+create policy "anon_configs" on configs for all to anon using (true) with check (true);
+
+alter publication supabase_realtime add table transacoes;
+alter publication supabase_realtime add table configs;`;
+
+  async function copiarSQL() {
+    try {
+      await navigator.clipboard.writeText(SQL_SETUP);
+      const btn = document.querySelector('[onclick="App.copiarSQL()"]');
+      if (btn) { const orig = btn.textContent; btn.textContent = 'Copiado!'; setTimeout(() => btn.textContent = orig, 2000); }
+    } catch { alert(SQL_SETUP); }
+  }
+
+  async function copiarCasalId() {
+    const val = document.getElementById('setup-casal-id').value;
+    if (!val) { alert('Gere um ID primeiro'); return; }
+    try {
+      await navigator.clipboard.writeText(val);
+      const btn = document.querySelector('[onclick="App.copiarCasalId()"]');
+      if (btn) { const orig = btn.textContent; btn.textContent = 'Copiado!'; setTimeout(() => btn.textContent = orig, 1500); }
+    } catch { alert('ID: ' + val); }
+  }
+
   function setup() {
-    const fbUrl = document.getElementById('setup-firebase-url').value.trim();
+    const url = document.getElementById('setup-supabase-url').value.trim();
+    const key = document.getElementById('setup-supabase-key').value.trim();
+    const casalId = document.getElementById('setup-casal-id').value.trim();
     const apiKey = document.getElementById('setup-api-key').value.trim();
     const nome = document.getElementById('setup-nome').value.trim();
 
-    if (!fbUrl) { alert('Informe a URL do Firebase.'); return; }
-    if (!fbUrl.startsWith('https://')) { alert('URL do Firebase deve começar com https://'); return; }
+    if (!url) { alert('Informe a URL do projeto Supabase.'); return; }
+    if (!url.startsWith('https://')) { alert('URL deve começar com https://'); return; }
+    if (!key) { alert('Informe a chave anon do Supabase.'); return; }
+    if (!casalId) { alert('Gere ou cole o ID do casal.'); return; }
 
-    cfg = { firebaseUrl: fbUrl, apiKey, nome: nome || 'Finanças do Casal' };
+    cfg = { supabaseUrl: url, supabaseKey: key, casalId, apiKey, nome: nome || 'Finanças do Casal' };
     saveCfg();
     initApp();
   }
@@ -173,12 +229,12 @@ const App = (() => {
 
     if (cfg.local) {
       setSyncStatus('local');
-    } else {
+    } else if (initSupabase()) {
       setSyncStatus('syncing');
-      loadAllFromFirebase();
-      setInterval(loadAllFromFirebase, 30000);
+      loadAllFromSupabase().then(() => subscribeRealtime());
+    } else {
+      setSyncStatus('offline');
     }
-
     render();
   }
 
@@ -230,7 +286,7 @@ const App = (() => {
       .sort((a, b) => b.data.localeCompare(a.data));
   }
 
-  /* ───── LANCAMENTO ───── */
+  /* ───── LANÇAMENTO ───── */
   async function addLancamento(data) {
     const tx = data || {
       tipo,
@@ -256,7 +312,7 @@ const App = (() => {
     render();
   }
 
-  /* ───── ORCAMENTOS ───── */
+  /* ───── ORÇAMENTOS ───── */
   async function addOrcamento() {
     const cat = document.getElementById('orc-cat').value;
     const val = parseFloat(document.getElementById('orc-val').value);
@@ -328,9 +384,14 @@ const App = (() => {
       try {
         const res = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': cfg.apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-haiku-4-5-20251001',
             max_tokens: 800,
             messages: [{
               role: 'user',
@@ -354,7 +415,7 @@ const App = (() => {
         if (parsed.categoria) document.getElementById('ai-cat').value = parsed.categoria;
         document.getElementById('ai-loading').style.display = 'none';
         document.getElementById('ai-result').style.display = 'block';
-      } catch (err) {
+      } catch {
         document.getElementById('ai-loading').style.display = 'none';
         alert('Erro ao processar imagem. Tente novamente ou lance manualmente na aba Lançar.');
       }
@@ -388,7 +449,9 @@ const App = (() => {
 
   /* ───── SETTINGS ───── */
   function openSettings() {
-    document.getElementById('cfg-firebase').value = cfg.firebaseUrl || '';
+    document.getElementById('cfg-supabase-url').value = cfg.supabaseUrl || '';
+    document.getElementById('cfg-supabase-key').value = cfg.supabaseKey || '';
+    document.getElementById('cfg-casal-id').value = cfg.casalId || '';
     document.getElementById('cfg-api-key').value = cfg.apiKey || '';
     document.getElementById('cfg-nome').value = cfg.nome || '';
     document.getElementById('settings-modal').style.display = 'flex';
@@ -399,15 +462,20 @@ const App = (() => {
   }
 
   async function saveSettings() {
-    cfg.firebaseUrl = document.getElementById('cfg-firebase').value.trim();
+    cfg.supabaseUrl = document.getElementById('cfg-supabase-url').value.trim();
+    cfg.supabaseKey = document.getElementById('cfg-supabase-key').value.trim();
+    cfg.casalId = document.getElementById('cfg-casal-id').value.trim();
     cfg.apiKey = document.getElementById('cfg-api-key').value.trim();
     cfg.nome = document.getElementById('cfg-nome').value.trim() || 'Finanças do Casal';
-    cfg.local = !cfg.firebaseUrl;
+    cfg.local = !cfg.supabaseUrl;
     saveCfg();
     document.getElementById('header-nome').textContent = cfg.nome;
     closeSettings();
-    if (cfg.firebaseUrl) loadAllFromFirebase();
-    else setSyncStatus('local');
+    if (cfg.supabaseUrl && initSupabase()) {
+      loadAllFromSupabase().then(() => subscribeRealtime());
+    } else {
+      setSyncStatus('local');
+    }
     render();
   }
 
@@ -463,7 +531,7 @@ const App = (() => {
     </div>`;
   }
 
-  /* ───── RENDER HISTORICO ───── */
+  /* ───── RENDER HISTÓRICO ───── */
   function renderHistorico() {
     const query = (document.getElementById('search-input')?.value || '').toLowerCase();
     let txs = monthTxs();
@@ -488,7 +556,6 @@ const App = (() => {
 
   /* ───── MAIN RENDER ───── */
   function render() {
-    const mk = mkey(curDate);
     const lbl = mfmt(curDate);
     const mes = document.getElementById('header-mes');
     if (mes) mes.textContent = lbl;
@@ -635,10 +702,11 @@ const App = (() => {
     const splitEl = document.getElementById('pessoa-split');
     if (splitEl) {
       const pessoas = ['Ele', 'Ela', 'Os dois'];
+      const mk = mkey(curDate);
       const totais = pessoas.map(p => ({
         nome: p,
         val: Object.values(db.txs)
-          .filter(t => t.tipo === 'despesa' && t.pessoa === p && t.data && t.data.startsWith(mkey(curDate)))
+          .filter(t => t.tipo === 'despesa' && t.pessoa === p && t.data && t.data.startsWith(mk))
           .reduce((s, t) => s + t.val, 0)
       }));
       const max = Math.max(...totais.map(t => t.val), 1);
@@ -659,7 +727,7 @@ const App = (() => {
     loadCfg();
     document.getElementById('f-data') && (document.getElementById('f-data').value = today());
 
-    if (cfg.firebaseUrl || cfg.local) {
+    if (cfg.supabaseUrl || cfg.local) {
       if (cfg.local) {
         db.txs = localDB('txs', {});
         db.orcamentos = localDB('orcamentos', []);
@@ -675,12 +743,13 @@ const App = (() => {
   document.addEventListener('DOMContentLoaded', boot);
 
   return {
-    setup, setupLocal, navTo, changeMonth, setTipo,
+    setup, setupLocal, copiarSQL, navTo, changeMonth, setTipo,
     addLancamento, deleteTx,
     addOrcamento, deleteOrcamento,
     addContaFixa, toggleContaFixa, deleteContaFixa,
     readComprovante, salvarAI, resetComp,
     openSettings, closeSettings, saveSettings, resetAll,
+    gerarCasalId, copiarCasalId,
     renderHistorico
   };
 
