@@ -1,101 +1,328 @@
-# Finanças do Casal
+# FinanciadoCasal
 
-App web para controle financeiro do casal — funciona no celular direto pelo navegador, com sincronização em tempo real via Supabase e leitura de comprovantes por IA.
+[![Deploy with Vercel](https://img.shields.io/badge/Deploy-Vercel-000000?style=flat&logo=vercel)](https://vercel.com)
+[![Powered by Supabase](https://img.shields.io/badge/Database-Supabase-3ECF8E?style=flat&logo=supabase)](https://supabase.com)
+[![Payments by Stripe](https://img.shields.io/badge/Payments-Stripe-6772E5?style=flat&logo=stripe)](https://stripe.com)
+[![IA by Anthropic](https://img.shields.io/badge/IA-Anthropic-D4A27F?style=flat)](https://anthropic.com)
+[![Made in Brazil](https://img.shields.io/badge/Made%20in-Brazil%20%F0%9F%87%A7%F0%9F%87%B7-009C3B?style=flat)](https://github.com/Thaislaine997)
+
+**O app de finanças feito exclusivamente para casais.** Sincronização em tempo real entre dois celulares, IA que extrai dados de comprovantes, controle de orçamentos por categoria e muito mais — sem instalar nada.
+
+---
+
+## Descrição
+
+O FinanciadoCasal resolve um problema real: gerenciar finanças com o parceiro é difícil. Planilhas não sincronizam, apps genéricos não têm contexto de casal, e sempre surge a dúvida "quem pagou o quê?".
+
+Com o FinanciadoCasal, os dois têm visão em tempo real de tudo: receitas, despesas, orçamentos e contas fixas. Um registra o mercado no celular e o outro vê na hora. A IA lê o comprovante do WhatsApp e preenche tudo automaticamente.
+
+---
 
 ## Funcionalidades
 
-- **Resumo mensal** — receitas, despesas, saldo, orçamento vs gasto e contas fixas
-- **Lançar** — registra receitas e despesas com categoria, data e quem pagou
-- **Comprovante IA** — foto ou print do comprovante; a IA extrai os dados automaticamente
-- **Previsão** — orçamento por categoria e contas fixas com controle de pagamento
-- **Gráficos** — pizza por categoria, barras de orçamento vs real, divisão por pessoa
-- **Histórico** — lista completa com busca por descrição ou categoria
-- **Sync em tempo real** — Supabase Realtime sincroniza os dois celulares instantaneamente
+- **Sync em tempo real** — via Supabase Realtime, sem delays
+- **IA para comprovantes** — foto ou print do comprovante, a IA extrai tudo
+- **Contas fixas** — cadastre uma vez, o app controla sempre
+- **Orçamentos por categoria** — preveja e acompanhe o gasto real
+- **Gráficos detalhados** — pizza por categoria, receita vs despesa, divisão por pessoa
+- **Divisão por pessoa** — Ele, Ela ou Os dois
+- **Modo offline** — funciona sem sync para uso individual
+- **PWA ready** — adicione na tela inicial, funciona como app nativo
+- **Plano Pro** — lançamentos ilimitados + IA ilimitada via Stripe
+- **Histórico com busca** — encontre qualquer lançamento em segundos
 
-## Deploy no GitHub Pages
+---
 
-1. Fork este repositório
-2. Vá em **Settings → Pages**
-3. Source: `Deploy from a branch` → branch `main` → pasta `/ (root)`
-4. Aguarde ~1 min → link em `https://<seu-usuario>.github.io/CasalTEC-IA/`
+## Tech Stack
 
-## Configuração do Supabase (sincronização gratuita)
+| Camada | Tecnologia | Função |
+|--------|-----------|--------|
+| Frontend | HTML5 + CSS3 + JavaScript Vanilla | App + Landing Page |
+| Database | Supabase (PostgreSQL) | Armazenamento e sync |
+| Realtime | Supabase Realtime (WebSockets) | Sincronização ao vivo |
+| IA | Anthropic Claude (Vision) | Leitura de comprovantes |
+| Pagamentos | Stripe | Plano Pro — checkout e webhooks |
+| Deploy | Vercel | Hosting + Serverless Functions |
+| Fontes | Google Fonts (Inter, DM Sans) | Tipografia |
 
-### 1. Criar projeto
+---
 
-1. Acesse [supabase.com/dashboard](https://supabase.com/dashboard) e crie um projeto
-2. Anote a **URL do projeto** e a **chave anon (public)** em **Settings → API**
+## Estrutura do projeto
 
-### 2. Criar tabelas
+```
+financiadocasal/
+├── index.html              # Landing page (público)
+├── app.html                # Dashboard do app (usuários)
+├── css/
+│   ├── landing.css         # Estilos da landing page
+│   └── style.css           # Estilos do app dashboard
+├── js/
+│   └── app.js              # Lógica principal do app
+├── api/
+│   ├── check-subscription.js   # Verifica status Pro no Stripe
+│   ├── create-checkout.js      # Cria sessão de checkout Stripe
+│   ├── customer-portal.js      # Portal do cliente Stripe
+│   └── stripe-webhook.js       # Webhook de eventos Stripe
+├── vercel.json             # Configuração de rotas e deploy
+└── package.json            # Dependências Node.js (Stripe SDK)
+```
 
-No painel do Supabase, vá em **SQL Editor** e execute:
+### Diagrama de arquitetura
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                      Vercel CDN                          │
+│                                                          │
+│   /              → index.html  (Landing Page)            │
+│   /app           → app.html    (Dashboard)               │
+│   /api/*         → Serverless Functions                  │
+└──────────────────┬──────────────────────────────────────┘
+                   │
+        ┌──────────┴──────────┐
+        │                     │
+┌───────▼──────┐    ┌─────────▼────────┐
+│   Supabase   │    │   Stripe API     │
+│              │    │                  │
+│  PostgreSQL  │    │  Checkout        │
+│  Auth        │    │  Webhooks        │
+│  Realtime    │    │  Portal          │
+│  Storage     │    └──────────────────┘
+└───────┬──────┘
+        │
+        │  WebSocket (Realtime)
+        │
+┌───────▼──────────────────────────────┐
+│           Celular A (Ela)            │
+│    FinanciadoCasal → app.html        │
+└──────────────────────────────────────┘
+        │  (mesmo casal_id)
+┌───────▼──────────────────────────────┐
+│           Celular B (Ele)            │
+│    FinanciadoCasal → app.html        │
+└──────────────────────────────────────┘
+```
+
+---
+
+## Setup — Primeiros passos
+
+### 1. Supabase — Banco de dados
+
+1. Crie uma conta em [supabase.com](https://supabase.com) (gratuito)
+2. Crie um novo projeto
+3. Vá em **SQL Editor** e execute o SQL abaixo:
 
 ```sql
-create table if not exists transacoes (
-  id bigint primary key,
-  casal_id text not null,
-  tipo text not null,
-  val numeric(12,2) not null,
-  descricao text not null,
-  data date not null,
-  cat text not null,
-  pessoa text not null,
-  ai_import boolean default false,
-  created_at timestamptz default now()
+-- Tabela de lançamentos (receitas e despesas)
+CREATE TABLE lancamentos (
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  casal_id    TEXT NOT NULL,
+  tipo        TEXT NOT NULL CHECK (tipo IN ('receita', 'despesa')),
+  descricao   TEXT NOT NULL,
+  valor       NUMERIC(12, 2) NOT NULL,
+  data        DATE NOT NULL,
+  categoria   TEXT NOT NULL,
+  pessoa      TEXT NOT NULL DEFAULT 'Os dois',
+  via_ia      BOOLEAN DEFAULT FALSE,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
-create table if not exists configs (
-  casal_id text not null,
-  chave text not null,
-  valor jsonb,
-  primary key (casal_id, chave)
+-- Tabela de orçamentos por categoria
+CREATE TABLE orcamentos (
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  casal_id    TEXT NOT NULL,
+  categoria   TEXT NOT NULL,
+  valor       NUMERIC(12, 2) NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (casal_id, categoria)
 );
 
-alter table transacoes enable row level security;
-alter table configs enable row level security;
+-- Tabela de contas fixas
+CREATE TABLE contas_fixas (
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  casal_id    TEXT NOT NULL,
+  nome        TEXT NOT NULL,
+  valor       NUMERIC(12, 2) NOT NULL,
+  dia_venc    INTEGER NOT NULL CHECK (dia_venc BETWEEN 1 AND 31),
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
 
-create policy "anon_transacoes" on transacoes for all to anon using (true) with check (true);
-create policy "anon_configs" on configs for all to anon using (true) with check (true);
+-- Tabela de pagamentos de contas fixas por mês
+CREATE TABLE contas_pagas (
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  casal_id    TEXT NOT NULL,
+  conta_id    UUID REFERENCES contas_fixas(id) ON DELETE CASCADE,
+  mes         TEXT NOT NULL,
+  pago        BOOLEAN DEFAULT FALSE,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (casal_id, conta_id, mes)
+);
 
-alter publication supabase_realtime add table transacoes;
-alter publication supabase_realtime add table configs;
+-- Índices para performance
+CREATE INDEX idx_lancamentos_casal_id ON lancamentos(casal_id);
+CREATE INDEX idx_lancamentos_data ON lancamentos(data);
+CREATE INDEX idx_orcamentos_casal_id ON orcamentos(casal_id);
+CREATE INDEX idx_contas_fixas_casal_id ON contas_fixas(casal_id);
+CREATE INDEX idx_contas_pagas_casal_id ON contas_pagas(casal_id);
+
+-- RLS (Row Level Security)
+ALTER TABLE lancamentos   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orcamentos    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contas_fixas  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contas_pagas  ENABLE ROW LEVEL SECURITY;
+
+-- Policies: acesso público por casal_id
+CREATE POLICY "casal_lancamentos" ON lancamentos   FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "casal_orcamentos"  ON orcamentos    FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "casal_fixas"       ON contas_fixas  FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "casal_pagas"       ON contas_pagas  FOR ALL USING (true) WITH CHECK (true);
+
+-- Habilitar Realtime nas tabelas
+ALTER PUBLICATION supabase_realtime ADD TABLE lancamentos;
+ALTER PUBLICATION supabase_realtime ADD TABLE contas_pagas;
 ```
 
-> O botão **"Copiar SQL →"** na tela de setup do app já copia esse SQL pronto.
+4. Vá em **Settings → API** e copie:
+   - **Project URL** (ex: `https://xxxxx.supabase.co`)
+   - **anon public key** (começa com `eyJ...`)
 
-### 3. Primeiro acesso
+---
 
-1. Abra o app no **primeiro celular**
-2. Preencha a URL e chave anon do Supabase
-3. Clique em **⟳** para gerar um ID do casal e depois **⎘** para copiar
-4. Cole o nome do casal e confirme
+### 2. Variáveis de ambiente no Vercel
 
-No **segundo celular**:
-1. Abra o mesmo link
-2. Preencha URL e chave anon do Supabase
-3. Cole o mesmo ID do casal gerado no primeiro celular
-4. Os dados sincronizam automaticamente em tempo real
+Configure no painel do Vercel em Settings → Environment Variables:
 
-## Leitura de comprovantes (opcional)
+```env
+# Stripe (necessário para Plano Pro)
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_ID_MONTHLY=price_...
+STRIPE_PRICE_ID_YEARLY=price_...
 
-1. Acesse [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
-2. Crie uma chave de API
-3. Cole no campo **Chave API Anthropic** durante o setup
-
-## Estrutura
-
-```
-CasalTEC-IA/
-├── index.html       # App completo
-├── css/
-│   └── style.css    # Estilos
-└── js/
-    └── app.js       # Lógica + Supabase + IA
+# Supabase admin (para operações server-side)
+SUPABASE_URL=https://xxxxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
 ```
 
-## Tecnologias
+> As credenciais Supabase do usuário (URL + anon key) ficam no `localStorage` do navegador, configuradas pelo próprio usuário no app.
 
-- HTML/CSS/JS puro — sem framework
-- [Supabase](https://supabase.com) — banco de dados + sync em tempo real
-- [Chart.js](https://www.chartjs.org/) — gráficos
-- [Anthropic Claude API](https://anthropic.com) — leitura de comprovantes por visão
+---
+
+### 3. Deploy no Vercel
+
+```bash
+# 1. Clone o repositório
+git clone https://github.com/Thaislaine997/CasalTEC-IA.git
+cd CasalTEC-IA
+
+# 2. Instale dependências
+npm install
+
+# 3. Deploy
+npx vercel --prod
+```
+
+Ou conecte o repositório diretamente no painel do Vercel para CI/CD automático.
+
+---
+
+## Endpoints da API
+
+### `POST /api/create-checkout`
+
+Cria uma sessão de checkout no Stripe para upgrade Pro.
+
+**Request:**
+```json
+{ "plan": "mensal", "casal_id": "uuid-do-casal", "success_url": "...", "cancel_url": "..." }
+```
+
+**Response:**
+```json
+{ "url": "https://checkout.stripe.com/pay/cs_..." }
+```
+
+---
+
+### `POST /api/check-subscription`
+
+Verifica se o casal tem assinatura Pro ativa.
+
+**Request:**
+```json
+{ "casal_id": "uuid-do-casal" }
+```
+
+**Response:**
+```json
+{ "pro": true, "plan": "yearly", "expires_at": "2027-05-29T00:00:00Z" }
+```
+
+---
+
+### `POST /api/customer-portal`
+
+Gera URL do portal do cliente Stripe para gerenciar/cancelar assinatura.
+
+**Request:**
+```json
+{ "casal_id": "uuid-do-casal", "return_url": "https://financiadocasal.com.br/app" }
+```
+
+**Response:**
+```json
+{ "url": "https://billing.stripe.com/p/session/..." }
+```
+
+---
+
+### `POST /api/stripe-webhook`
+
+Webhook do Stripe. Configurar no Stripe Dashboard:
+`https://financiadocasal.com.br/api/stripe-webhook`
+
+Eventos processados:
+- `checkout.session.completed`
+- `customer.subscription.deleted`
+- `customer.subscription.updated`
+
+---
+
+## Rotas
+
+| Rota | Destino | Descrição |
+|------|---------|-----------|
+| `/` | `index.html` | Landing page pública |
+| `/app` | `app.html` | Dashboard (redireciona para `/` se não configurado) |
+| `/api/*` | `api/*.js` | Serverless Functions |
+| `/*` | `index.html` | Fallback |
+
+---
+
+## Desenvolvimento local
+
+```bash
+npm install -g vercel
+vercel dev
+# Disponível em http://localhost:3000
+```
+
+---
+
+## Contribuindo
+
+1. Fork o repositório
+2. Crie uma branch: `git checkout -b feat/minha-feature`
+3. Commit: `git commit -m 'feat: adiciona minha feature'`
+4. Push: `git push origin feat/minha-feature`
+5. Abra um Pull Request
+
+**Convenções de commit:** `feat:`, `fix:`, `style:`, `refactor:`, `docs:`, `chore:`
+
+---
+
+## Licença
+
+MIT © 2026 [Thaislaine](https://github.com/Thaislaine997)
+
+Feito com amor no Brasil 🇧🇷
