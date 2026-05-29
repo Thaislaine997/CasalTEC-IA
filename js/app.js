@@ -232,6 +232,7 @@ alter publication supabase_realtime add table configs;`;
     } else if (initSupabase()) {
       setSyncStatus('syncing');
       loadAllFromSupabase().then(() => subscribeRealtime());
+      checkAssinatura();
     } else {
       setSyncStatus('offline');
     }
@@ -722,6 +723,119 @@ alter publication supabase_realtime add table configs;`;
     }
   }
 
+  /* ───── ASSINATURA / STRIPE ───── */
+  let planoSelecionado = 'anual';
+  let assinatura = { plano: 'free', ativo: false };
+
+  async function checkAssinatura() {
+    if (!cfg.casalId) return;
+    try {
+      const res = await fetch('/api/check-subscription?casalId=' + encodeURIComponent(cfg.casalId));
+      if (res.ok) {
+        assinatura = await res.json();
+        atualizarUI();
+      }
+    } catch {}
+  }
+
+  function atualizarUI() {
+    const badgePro = document.getElementById('badge-pro');
+    const cfgAss = document.getElementById('cfg-assinatura');
+    const labelEl = document.getElementById('cfg-plano-label');
+    const detalheEl = document.getElementById('cfg-plano-detalhe');
+    const btnEl = document.getElementById('cfg-plano-btn');
+
+    if (badgePro) badgePro.style.display = assinatura.ativo ? 'inline-flex' : 'none';
+
+    if (cfgAss) {
+      cfgAss.style.display = 'block';
+      if (labelEl) labelEl.textContent = assinatura.ativo ? 'Plano Pro ✓' : 'Plano Free';
+      if (detalheEl) {
+        detalheEl.textContent = assinatura.ativo
+          ? 'Lançamentos ilimitados · tudo liberado'
+          : '30 lançamentos/mês · 5 comprovantes IA';
+      }
+      if (btnEl) {
+        btnEl.textContent = assinatura.ativo ? 'Gerenciar assinatura' : 'Assinar Pro';
+        btnEl.className = assinatura.ativo ? 'btn-portal' : 'btn-upgrade';
+      }
+    }
+
+    const sucesso = new URLSearchParams(location.search).get('sucesso');
+    if (sucesso) {
+      history.replaceState({}, '', location.pathname);
+      mostrarToast('Assinatura ativada! Bem-vindos ao Pro 🎉');
+    }
+  }
+
+  function mostrarToast(msg) {
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.classList.add('show'), 10);
+    setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 4000);
+  }
+
+  function abrirUpgrade() {
+    if (assinatura.ativo) {
+      gerenciarAssinatura();
+      return;
+    }
+    document.getElementById('upgrade-modal').style.display = 'flex';
+    document.getElementById('settings-modal').style.display = 'none';
+  }
+
+  function fecharUpgrade() {
+    document.getElementById('upgrade-modal').style.display = 'none';
+  }
+
+  function selecionarPlano(plano) {
+    planoSelecionado = plano;
+    document.getElementById('opt-mensal').classList.toggle('selected', plano === 'mensal');
+    document.getElementById('opt-anual').classList.toggle('selected', plano === 'anual');
+  }
+
+  async function assinar() {
+    const btn = document.getElementById('btn-assinar');
+    btn.textContent = 'Aguarde...';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ casalId: cfg.casalId, plano: planoSelecionado, nome: cfg.nome })
+      });
+      const data = await res.json();
+      if (data.url) {
+        location.href = data.url;
+      } else {
+        alert('Erro ao iniciar pagamento: ' + (data.error || 'tente novamente'));
+        btn.textContent = 'Assinar agora →';
+        btn.disabled = false;
+      }
+    } catch {
+      alert('Erro de conexão. Tente novamente.');
+      btn.textContent = 'Assinar agora →';
+      btn.disabled = false;
+    }
+  }
+
+  async function gerenciarAssinatura() {
+    try {
+      const res = await fetch('/api/customer-portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ casalId: cfg.casalId })
+      });
+      const data = await res.json();
+      if (data.url) location.href = data.url;
+      else alert('Erro ao abrir portal: ' + (data.error || 'tente novamente'));
+    } catch {
+      alert('Erro de conexão. Tente novamente.');
+    }
+  }
+
   /* ───── BOOT ───── */
   function boot() {
     loadCfg();
@@ -750,6 +864,7 @@ alter publication supabase_realtime add table configs;`;
     readComprovante, salvarAI, resetComp,
     openSettings, closeSettings, saveSettings, resetAll,
     gerarCasalId, copiarCasalId,
+    abrirUpgrade, fecharUpgrade, selecionarPlano, assinar,
     renderHistorico
   };
 
