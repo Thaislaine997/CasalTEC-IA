@@ -1,11 +1,16 @@
 const { createClient } = require('@supabase/supabase-js');
+const rateLimit = require('./_rateLimit');
+const { wrap } = require('./_sentry');
 
-module.exports = async function handler(req, res) {
+module.exports = wrap(async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Método não permitido' });
+
+  // 30 consultas por minuto por IP
+  if (await rateLimit(req, res, { limit: 30, windowMs: 60_000, key: 'check-sub' })) return;
 
   const { casalId } = req.query;
   if (!casalId) return res.status(400).json({ error: 'casalId obrigatório' });
@@ -35,4 +40,4 @@ module.exports = async function handler(req, res) {
     periodo_fim: data.periodo_fim,
     ativo
   });
-};
+});

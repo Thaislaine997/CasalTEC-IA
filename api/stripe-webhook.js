@@ -1,9 +1,10 @@
 const Stripe = require('stripe');
 const { createClient } = require('@supabase/supabase-js');
+const { wrap } = require('./_sentry');
 
-module.exports.config = {
-  api: { bodyParser: false }
-};
+// In-memory dedup: Stripe may redeliver events on non-200 or timeouts
+const processedEvents = new Set();
+const MAX_EVENTS = 1000;
 
 async function getRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -14,7 +15,7 @@ async function getRawBody(req) {
   });
 }
 
-module.exports = async function handler(req, res) {
+const handler = wrap(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
@@ -32,6 +33,15 @@ module.exports = async function handler(req, res) {
   } catch (err) {
     console.error('Webhook inválido:', err.message);
     return res.status(400).json({ error: `Webhook error: ${err.message}` });
+  }
+
+  // Deduplicate: Stripe retries events on non-200 or timeouts
+  if (processedEvents.has(event.id)) {
+    return res.status(200).json({ received: true, duplicate: true });
+  }
+  processedEvents.add(event.id);
+  if (processedEvents.size > MAX_EVENTS) {
+    processedEvents.delete(processedEvents.values().next().value);
   }
 
   const obj = event.data.object;
@@ -91,4 +101,5 @@ module.exports = async function handler(req, res) {
   }
 
   return res.status(200).json({ received: true });
-};
+}, { api: { bodyParser: false } });
+module.exports = handler;

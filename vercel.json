@@ -1,9 +1,18 @@
 {
   "version": 2,
   "framework": null,
+  "crons": [
+    { "path": "/api/monthly-report", "schedule": "0 11 1 * *" },
+    { "path": "/api/bill-reminder",  "schedule": "0 11 * * *" }
+  ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/app", "dest": "/app.html" },
+    { "src": "/login", "dest": "/login.html" },
+    { "src": "/register", "dest": "/register.html" },
+    { "src": "/reset-password", "dest": "/reset-password.html" },
+    { "src": "/privacidade", "dest": "/privacidade.html" },
+    { "src": "/termos", "dest": "/termos.html" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]

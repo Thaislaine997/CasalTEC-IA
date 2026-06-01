@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Criar conta — FinanciadoCasal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #070b14; --bg2: #0d1424; --bg3: #141d2e;
+      --accent: #5ee7b0; --accent2: #7eb8f5;
+      --text1: #f1f5f9; --text2: #94a3b8; --text3: #4a5568;
+      --radius: 14px; --danger: #ff6b6b;
+    }
+    body { background: var(--bg); color: var(--text1); font-family: 'Inter', sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+    .logo-link { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text1); margin-bottom: 32px; }
+    .logo-link span { font-size: 18px; font-weight: 700; }
+    .card { background: var(--bg2); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; padding: 36px 32px; width: 100%; max-width: 460px; }
+    .card h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .card p.subtitle { font-size: 14px; color: var(--text2); margin-bottom: 28px; }
+    .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; color: var(--text3); margin: 22px 0 14px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+    .field input { width: 100%; background: var(--bg3); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 13px 14px; font-size: 15px; color: var(--text1); font-family: 'Inter', sans-serif; transition: border-color .2s; outline: none; }
+    .field input:focus { border-color: var(--accent); }
+    .field input::placeholder { color: var(--text3); }
+    .field small { display: block; font-size: 11px; color: var(--text3); margin-top: 5px; }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .btn-primary { width: 100%; background: var(--accent); color: #070b14; border: none; border-radius: 10px; padding: 14px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; transition: opacity .2s, transform .1s; }
+    .btn-primary:hover { opacity: .9; }
+    .btn-primary:active { transform: scale(.98); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .toggle-join { background: var(--bg3); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; cursor: pointer; font-size: 13px; color: var(--text2); display: flex; align-items: center; justify-content: space-between; user-select: none; }
+    .toggle-join:hover { border-color: var(--accent2); color: var(--text1); }
+    .toggle-join span { font-size: 18px; transition: transform .2s; }
+    .join-section { display: none; }
+    .join-section.open { display: block; }
+    .error-msg { background: rgba(255,107,107,.12); border: 1px solid rgba(255,107,107,.3); border-radius: 10px; padding: 12px 14px; font-size: 13px; color: var(--danger); margin-bottom: 16px; display: none; }
+    .success-msg { background: rgba(94,231,176,.12); border: 1px solid rgba(94,231,176,.3); border-radius: 10px; padding: 12px 14px; font-size: 13px; color: var(--accent); margin-bottom: 16px; display: none; }
+    .links { margin-top: 22px; text-align: center; font-size: 13px; color: var(--text2); }
+    .links a { color: var(--accent); text-decoration: none; font-weight: 500; }
+    .links a:hover { text-decoration: underline; }
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(7,11,20,.3); border-top-color: #070b14; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .casal-id-display { background: var(--bg3); border: 1px solid rgba(94,231,176,.2); border-radius: 10px; padding: 10px 14px; font-size: 13px; color: var(--accent); font-family: monospace; word-break: break-all; display: none; margin-top: 8px; }
+    .consent-row { display: flex; align-items: flex-start; gap: 10px; margin: 18px 0 4px; padding: 14px; background: var(--bg3); border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); }
+    .consent-row input[type=checkbox] { flex-shrink: 0; width: 18px; height: 18px; margin-top: 1px; accent-color: var(--accent); cursor: pointer; }
+    .consent-row label { font-size: 13px; color: var(--text2); line-height: 1.5; cursor: pointer; }
+    .consent-row label a { color: var(--accent); text-decoration: none; font-weight: 500; }
+    .consent-row label a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <a href="/" class="logo-link">
+    <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
+      <rect width="40" height="40" rx="10" fill="#1a2035"/>
+      <path d="M12 20C12 15.58 15.58 12 20 12C24.42 12 28 15.58 28 20" stroke="#5ee7b0" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M20 28C20 28 14 24.5 14 20" stroke="#5ee7b0" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M26 20C26 22.21 24.21 24 22 24C19.79 24 18 22.21 18 20" stroke="#7eb8f5" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="20" cy="20" r="2" fill="#5ee7b0"/>
+    </svg>
+    <span>FinanciadoCasal</span>
+  </a>
+
+  <div class="card">
+    <h1>Criar conta</h1>
+    <p class="subtitle">Comece grátis. Sem cartão de crédito.</p>
+
+    <div id="error-msg" class="error-msg"></div>
+    <div id="success-msg" class="success-msg"></div>
+
+    <div class="section-title">Acesso</div>
+    <div class="field">
+      <label>E-mail</label>
+      <input type="email" id="email" placeholder="voces@email.com" autocomplete="email" autofocus>
+    </div>
+    <div class="row-2">
+      <div class="field">
+        <label>Senha</label>
+        <input type="password" id="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label>Confirmar senha</label>
+        <input type="password" id="confirm" placeholder="Repita a senha" autocomplete="new-password">
+      </div>
+    </div>
+
+    <div class="section-title">Sobre o casal</div>
+    <div class="field">
+      <label>Nome do casal</label>
+      <input type="text" id="nome" placeholder="Ex: Ana &amp; João" autocomplete="off">
+    </div>
+    <div class="row-2">
+      <div class="field">
+        <label>Nome dela</label>
+        <input type="text" id="nome-ela" placeholder="Ex: Ana" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Nome dele</label>
+        <input type="text" id="nome-ele" placeholder="Ex: João" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="section-title">Parceiro</div>
+    <div class="toggle-join" onclick="toggleJoin()">
+      <span>Já tem parceiro(a) com conta? Entrar no mesmo casal</span>
+      <span id="toggle-icon">﹢</span>
+    </div>
+    <div class="join-section" id="join-section">
+      <div class="field">
+        <label>ID do casal do parceiro(a)</label>
+        <input type="text" id="casal-id-parceiro" placeholder="Cole o ID compartilhado pelo parceiro(a)" autocomplete="off">
+        <small>Peça para o parceiro(a) abrir o app → Configurações → copiar o ID do casal</small>
+      </div>
+    </div>
+
+    <div class="consent-row">
+      <input type="checkbox" id="consent" aria-required="true">
+      <label for="consent">
+        Li e aceito os <a href="/termos" target="_blank">Termos de Uso</a> e a
+        <a href="/privacidade" target="_blank">Política de Privacidade</a>, incluindo o tratamento dos meus dados
+        conforme a LGPD.
+      </label>
+    </div>
+
+    <button class="btn-primary" id="btn-register" onclick="register()">Criar conta →</button>
+
+    <div class="links">
+      Já tem conta? <a href="/login">Entrar</a>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://unvfylyfhbqnwdnuxyzq.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVudmZ5bHlmaGJxbndkbnV4eXpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNzkwNTYsImV4cCI6MjA5NTY1NTA1Nn0.fiSnL3XZTGqgxpin5FzHHelrQu6YxuLRkky7iZTZV0I';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let joinOpen = false;
+    function toggleJoin() {
+      joinOpen = !joinOpen;
+      document.getElementById('join-section').classList.toggle('open', joinOpen);
+      document.getElementById('toggle-icon').textContent = joinOpen ? '−' : '﹢';
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent = msg; el.style.display = 'block';
+      document.getElementById('success-msg').style.display = 'none';
+    }
+    function showSuccess(msg) {
+      const el = document.getElementById('success-msg');
+      el.innerHTML = msg; el.style.display = 'block';
+      document.getElementById('error-msg').style.display = 'none';
+    }
+    function setLoading(on) {
+      const btn = document.getElementById('btn-register');
+      btn.disabled = on;
+      btn.innerHTML = on ? '<span class="spinner"></span>Criando conta...' : 'Criar conta →';
+    }
+
+    async function register() {
+      const email    = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const confirm  = document.getElementById('confirm').value;
+      const nome     = document.getElementById('nome').value.trim();
+      const nomeEla  = document.getElementById('nome-ela').value.trim();
+      const nomeEle  = document.getElementById('nome-ele').value.trim();
+      const parceiro = document.getElementById('casal-id-parceiro').value.trim();
+
+      if (!email)           { showError('Informe o e-mail.'); return; }
+      if (password.length < 6) { showError('A senha deve ter pelo menos 6 caracteres.'); return; }
+      if (password !== confirm) { showError('As senhas não coincidem.'); return; }
+      if (!document.getElementById('consent').checked) {
+        showError('Você precisa aceitar os Termos de Uso e a Política de Privacidade para criar uma conta.');
+        return;
+      }
+
+      const casalId = parceiro || crypto.randomUUID();
+      setLoading(true);
+
+      const { data, error } = await sb.auth.signUp({
+        email, password,
+        options: {
+          data: {
+            nome: nome || 'Finanças do Casal',
+            nomeEla, nomeEle,
+            casal_id: casalId
+          },
+          emailRedirectTo: window.location.origin + '/login'
+        }
+      });
+
+      setLoading(false);
+
+      if (error) {
+        const msgs = { 'User already registered': 'Este e-mail já possui uma conta. <a href="/login">Entrar</a>' };
+        showError(msgs[error.message] || error.message);
+        return;
+      }
+
+      if (data.session) {
+        // Email confirmation disabled — log in immediately
+        const cfg = {
+          supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_ANON_KEY,
+          casalId, nome: nome || 'Finanças do Casal', nomeEla, nomeEle
+        };
+        localStorage.setItem('casal_cfg', JSON.stringify(cfg));
+        window.location.replace('/app');
+      } else {
+        showSuccess(`✅ Conta criada! Verifique seu e-mail <strong>${email}</strong> para confirmar e depois <a href="/login">entrar</a>.`);
+        document.getElementById('btn-register').style.display = 'none';
+      }
+    }
+  </script>
+</body>
+</html>
